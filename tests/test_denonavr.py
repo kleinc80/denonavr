@@ -784,3 +784,33 @@ class TestMainFunctions:
             protocol.data_received(b"MV565\r")
             await self.future
             assert self.denon.volume == -23.5
+
+    @pytest.mark.asyncio
+    async def test_image_url_with_content_is_kept(self, httpx_mock: HTTPXMock):
+        """Check that an image URL delivering an image is kept."""
+        image_url = f"http://{FAKE_IP}/NetAudio/art.asp-jpg?1"
+        httpx_mock.add_response(url=image_url, content=b"JPEG")
+        self.denon = denonavr.DenonAVR(FAKE_IP)
+        # pylint: disable=protected-access
+        self.denon.input._image_url = image_url
+        await self.denon.input._async_test_image_accessible()
+        assert self.denon.input._image_available is True
+        assert self.denon.input._image_url == image_url
+
+    @pytest.mark.asyncio
+    async def test_image_url_with_empty_body_is_unset(self, httpx_mock: HTTPXMock):
+        """Check that an empty body is treated like a missing image."""
+        image_url = f"http://{FAKE_IP}/NetAudio/art.asp-jpg?1"
+        httpx_mock.add_response(url=image_url, content=b"")
+        self.denon = denonavr.DenonAVR(FAKE_IP)
+        # pylint: disable=protected-access
+        self.denon.input._image_url = image_url
+        await self.denon.input._async_test_image_accessible()
+        assert self.denon.input._image_available is False
+        assert self.denon.input._image_url is None
+
+        # The result is saved, the image is not requested again
+        self.denon.input._set_image_url(image_url)
+        assert self.denon.input._image_url is None
+        assert not self.denon.input._callback_tasks
+        assert len(httpx_mock.get_requests()) == 1

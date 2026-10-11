@@ -937,7 +937,10 @@ class DenonAVRInput(DenonAVRFoundation):
                 #  Set image URL to None.
                 self._image_url = None
             else:
-                self._image_available = True
+                # Some receivers answer with an empty body instead of an image
+                self._image_available = len(res.content) > 0
+                if not self._image_available:
+                    self._image_url = None
             finally:
                 # Close the default AsyncClient but keep custom clients open
                 if self._device.api.httpx_async_client.is_default_async_client():
